@@ -19,10 +19,28 @@ inputs:
     required: false
     default: ''
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  args:
-    - ${{ inputs.commenter_type }}
-    - ${{ inputs.commenter_input }}
-    - ${{ inputs.commenter_exitcode }}
-    - ${{ inputs.commenter_comment }}
+  using: 'composite'
+  steps:
+    - name: Write input to file
+      shell: bash
+      run: |
+        mkdir -p /tmp/terraform-pr-commenter
+        echo "${{ inputs.commenter_input }}" > /tmp/terraform-pr-commenter/input.txt
+
+    - name: Run Docker container
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        docker build -t terraform-pr-commenter .
+        docker run --rm \
+          -v /tmp/terraform-pr-commenter:/tmp/terraform-pr-commenter \
+          -e GITHUB_TOKEN="${GITHUB_TOKEN}" \
+          -e TF_WORKSPACE="${TF_WORKSPACE:-default}" \
+          -e EXPAND_SUMMARY_DETAILS="${EXPAND_SUMMARY_DETAILS:-true}" \
+          -e HIGHLIGHT_CHANGES="${HIGHLIGHT_CHANGES:-true}" \
+          -e GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH}" \
+          -v "${GITHUB_EVENT_PATH}":"${GITHUB_EVENT_PATH}" \
+          terraform-pr-commenter \
+          ${{ inputs.commenter_type }} \
+          ${{ inputs.commenter_exitcode }} \
+          "${{ inputs.commenter_comment }}"

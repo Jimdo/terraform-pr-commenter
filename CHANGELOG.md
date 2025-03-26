@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.0
+
+- Add wrapper script to handle large inputs
+- Fix "Argument list too long" errors that occur with large Terraform plans
+- Use file-based approach to process Terraform plan output
+- Update documentation to reflect the new approach
+
 ## v1.5.0
 
 - Bump to Terraform v1.0.6 internally (only affects `fmt`)

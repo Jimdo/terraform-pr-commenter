@@ -14,7 +14,12 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
 	exit 1
 fi
 
-if [[ -z $3 ]]; then
+if [[ ! -f /tmp/terraform-pr-commenter/input.txt ]]; then
+    echo "Input file missing at /tmp/terraform-pr-commenter/input.txt"
+    exit 1
+fi
+
+if [[ -z $2 ]]; then
     echo "There must be an exit code from a previous step."
     exit 1
 fi
@@ -24,17 +29,18 @@ if [[ ! "$1" =~ ^(fmt|init|plan|validate)$ ]]; then
   exit 1
 fi
 
-comment="$4"
+comment="$3"
 
 ##################
 # Shared Variables
 ##################
 # Arg 1 is command
 COMMAND=$1
-# Arg 2 is input. We strip ANSI colours.
-INPUT=$(echo "$2" | sed 's/\x1b\[[0-9;]*m//g')
-# Arg 3 is the Terraform CLI exit code
-EXIT_CODE=$3
+# Input is now from a file
+# Strip ANSI colours
+INPUT=$(cat /tmp/terraform-pr-commenter/input.txt | sed 's/\x1b\[[0-9;]*m//g')
+# Arg 2 is the Terraform CLI exit code
+EXIT_CODE=$2
 
 # Read TF_WORKSPACE environment variable or use "default"
 WORKSPACE=${TF_WORKSPACE:-default}
