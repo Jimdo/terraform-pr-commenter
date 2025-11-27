@@ -1,3 +1,5 @@
+TEST
+
 # Terraform PR Commenter
 
 Adds opinionated comments to PR's based on Terraform `fmt`, `init`, `plan` and `validate` outputs.
