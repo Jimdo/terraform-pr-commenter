@@ -63,6 +63,66 @@ fi
 # Read HIGHLIGHT_CHANGES environment variable or use "true"
 COLOURISE=${HIGHLIGHT_CHANGES:-true}
 
+###########
+# Functions
+###########
+# Moves Terraform's diff markers (-, +, ~) to the start of the line so GitHub
+# colourises them. Inside heredocs (e.g. a rendered YAML body) only markers at
+# the column Terraform uses for diffs are moved - a YAML list dash sits further
+# right and must stay untouched.
+move_diff_markers() {
+  awk '
+    function indent_of(s,   i, c) {
+      i = 0
+      c = substr(s, 1, 1)
+      while (c == " " || c == "\t") {
+        i++
+        c = substr(s, i + 1, 1)
+      }
+      return i
+    }
+    function shift(s, i) {
+      return substr(s, i + 1, 1) substr(s, 1, i) substr(s, i + 2)
+    }
+    {
+      ind = indent_of($0)
+      marker = substr($0, ind + 1, 1)
+      is_marker = (marker == "-" || marker == "+" || marker == "~")
+
+      if (in_heredoc) {
+        if (substr($0, ind + 1) == delim) {
+          in_heredoc = 0
+          print
+        } else if (is_marker && ind == marker_col) {
+          print shift($0, ind)
+        } else {
+          print
+        }
+        next
+      }
+
+      # Terraform prints the attribute name two columns right of its marker.
+      if (is_marker) {
+        attr_col = ind + 2
+      } else {
+        attr_col = ind
+      }
+      if (match($0, /<<[-~]?[A-Za-z_][A-Za-z0-9_]*$/)) {
+        delim = substr($0, RSTART + 2)
+        sub(/^[-~]/, "", delim)
+        marker_col = attr_col + 2
+        in_heredoc = 1
+      }
+
+      if (is_marker) {
+        print shift($0, ind)
+      } else {
+        print
+      }
+    }
+  '
+}
+
 ACCEPT_HEADER="Accept: application/vnd.github.v3+json"
 AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
 CONTENT_HEADER="Content-Type: application/json"
@@ -208,7 +268,7 @@ if [[ $COMMAND == 'plan' ]]; then
       PR_COMMENT="### ✓ Terraform \`plan\` Succeeded for Workspace: \`$WORKSPACE\` $comment - No Changes Detected"
     else
       CLEAN_PLAN=${CLEAN_PLAN::65300} # GitHub has a 65535-char comment limit - truncate plan, leaving space for comment wrapper
-      CLEAN_PLAN=$(echo "$CLEAN_PLAN" | sed -r 's/^([[:blank:]]*)([-+~])/\2\1/g') # Move any diff characters to start of line
+      CLEAN_PLAN=$(echo "$CLEAN_PLAN" | move_diff_markers)
       if [[ $COLOURISE == 'true' ]]; then
         CLEAN_PLAN=$(echo "$CLEAN_PLAN" | sed -r 's/^~/!/g') # Replace ~ with ! to colourise the diff in GitHub comments
       fi
