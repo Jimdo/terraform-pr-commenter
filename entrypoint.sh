@@ -134,15 +134,23 @@ delete_existing_comments() {
   local kind="$1"
   local pattern="$2"
 
-  echo -e "\033[34;1mINFO:\033[0m Looking for an existing $kind PR comment."
-  local id
-  id=$(curl -sS -H "$AUTH_HEADER" -H "$ACCEPT_HEADER" -L "$PR_COMMENTS_URL" | jq --arg re "$pattern" '.[] | select(.body|test($re)) | .id')
-  if [ "$id" ]; then
+  echo -e "\033[34;1mINFO:\033[0m Looking for existing $kind PR comments."
+  local ids="" page=1 body
+  # Collect all ids before deleting, so deletions don't shift the pages.
+  while :; do
+    body=$(curl -sS -H "$AUTH_HEADER" -H "$ACCEPT_HEADER" -L "$PR_COMMENTS_URL?per_page=100&page=$page")
+    [[ $(echo "$body" | jq 'length') -eq 0 ]] && break
+    ids="$ids $(echo "$body" | jq --arg re "$pattern" '.[] | select(.body|test($re)) | .id')"
+    page=$((page + 1))
+  done
+  if [[ -z "${ids// /}" ]]; then
+    echo -e "\033[34;1mINFO:\033[0m No existing $kind PR comment found."
+    return
+  fi
+  for id in $ids; do
     echo -e "\033[34;1mINFO:\033[0m Found existing $kind PR comment: $id. Deleting."
     curl -sS -X DELETE -H "$AUTH_HEADER" -H "$ACCEPT_HEADER" -L "$PR_COMMENT_URI/$id" > /dev/null
-  else
-    echo -e "\033[34;1mINFO:\033[0m No existing $kind PR comment found."
-  fi
+  done
 }
 
 ##############
