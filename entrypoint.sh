@@ -135,12 +135,18 @@ delete_existing_comments() {
   local pattern="$2"
 
   echo -e "\033[34;1mINFO:\033[0m Looking for existing $kind PR comments."
-  local ids="" page=1 body
+  local ids="" page=1 body count
   # Collect all ids before deleting, so deletions don't shift the pages.
   while :; do
     body=$(curl -sS -H "$AUTH_HEADER" -H "$ACCEPT_HEADER" -L "$PR_COMMENTS_URL?per_page=100&page=$page")
-    [[ $(echo "$body" | jq 'length') -eq 0 ]] && break
+    count=$(echo "$body" | jq 'if type == "array" then length else -1 end')
+    if [[ "$count" != [0-9]* ]]; then
+      echo -e "\033[33;1mWARNING:\033[0m Unexpected response while listing PR comments: $body"
+      break
+    fi
     ids="$ids $(echo "$body" | jq --arg re "$pattern" '.[] | select(.body|test($re)) | .id')"
+    # A short page is the last one.
+    [[ $count -lt 100 ]] && break
     page=$((page + 1))
   done
   if [[ -z "${ids// /}" ]]; then
