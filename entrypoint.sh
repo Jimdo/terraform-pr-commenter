@@ -90,7 +90,8 @@ move_diff_markers() {
       is_marker = (marker == "-" || marker == "+" || marker == "~")
 
       if (in_heredoc) {
-        if (substr($0, ind + 1) == delim) {
+        # The delimiter may be followed by "," (list element) or " -> null".
+        if (match($0, "^[ \t]*" delim "([ \t]*,|[ \t]*->.*)?[ \t]*$")) {
           in_heredoc = 0
           print
         } else if (is_marker && ind == marker_col) {
